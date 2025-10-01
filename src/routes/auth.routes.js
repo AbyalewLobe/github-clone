@@ -13,4 +13,4 @@ router.post("/google", googleLogin);
 // Protected route
 router.get("/profile", authMiddleware, getProfile);
 
-export default router;
+export default router; 
