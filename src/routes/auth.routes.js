@@ -1,16 +1,13 @@
-// src/routes/auth.routes.js
-import express from "express";
-import { register, login, getProfile, googleLogin } from "../controllers/auth.controller.js";
-import authMiddleware from "../middleware/authMiddleware.js";
+import express from 'express';
+import authController from '../controllers/auth.controller.js'; // Add .js extension
+import authMiddleware from '../middleware/authMiddleware.js';
 
-const router = express.Router();
+const authRoutes = express.Router();
 
-// Public routes
-router.post("/register", register);
-router.post("/login", login);
-router.post("/google", googleLogin);
+authRoutes.post('/signup', authController.signup);
+authRoutes.post('/login', authController.login); // Fixed: added missing slash
+authRoutes.post('/google',authController.googleLogin)
+authRoutes.get('/profile',authMiddleware.protect, authController.getProfile)
 
-// Protected route
-router.get("/profile", authMiddleware, getProfile);
+export default authRoutes; 
 
-export default router; 

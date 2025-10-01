@@ -1,88 +1,76 @@
-// src/controllers/auth.controllers.js
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { OAuth2Client } from "google-auth-library";
-import User from "../models/User.js";
-import { sendSuccess, sendError } from "../utils/response.js";
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+import User from "../models/User.js"; // Add .js extension
+import AppError from "../utils/appError.js";
+import { successResponse } from "../utils/response.js";
+import { hashPassword, comparePassword } from "../utils/hash.js";
+import { signToken } from "../utils/jwt.js";
 
-// ======================
-// Register (Local Signup)
-// ======================
-export const register = async (req, res) => {
+// Helper to create and send token
+const createSendToken = (user, statusCode, res) => {
+  const token = signToken({ id: user._id });
+
+  res.cookie("jwt", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  return successResponse(res, { user, token }, "Authentication successful", statusCode);
+};
+
+// Signup
+export const signup = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;
+    const hashedPassword = await hashPassword(password);
 
-    if (!username || !email || !password) {
-      return sendError(res, "All fields are required", 400);
-    }
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) return sendError(res, "Email already registered", 400);
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await User.create({
+    const newUser = await User.create({
       username,
       email,
-      password_hash: hashedPassword,
-      authProvider: "local",
+      password: hashedPassword,
     });
 
-    // don’t return password
-    const safeUser = user.toObject();
-    delete safeUser.password_hash;
-
-    return sendSuccess(res, safeUser, "User registered successfully", 201);
+    createSendToken(newUser, 201, res);
   } catch (err) {
-    return sendError(res, err.message, 500);
+    next(err);
   }
 };
 
-// ======================
-// Login (Local Signin)
-// ======================
-export const login = async (req, res) => {
+// Login
+export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return sendError(res, "All fields are required", 400);
 
-    const user = await User.findOne({ email });
-    if (!user) return sendError(res, "Invalid email or password", 401);
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) return next(new AppError("Invalid email or password", 401));
 
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) return sendError(res, "Invalid email or password", 401);
+    const valid = await comparePassword(password, user.password);
+    if (!valid) return next(new AppError("Invalid email or password", 401));
 
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
-    const safeUser = user.toObject();
-    delete safeUser.password_hash;
-
-    return sendSuccess(res, { user: safeUser, token }, "Login successful");
+    createSendToken(user, 200, res);
   } catch (err) {
-    return sendError(res, err.message, 500);
+    next(err);
   }
 };
 
 // ======================
 // Get Profile (Protected)
 // ======================
-export const getProfile = async (req, res) => {
+export const getProfile = async (req, res, next) => {
   try {
-    const userId = req.user.id; // set by authMiddleware
-    const user = await User.findById(userId).select("-password_hash");
-    if (!user) return sendError(res, "User not found", 404);
+    // req.user is set by the protect middleware
+    const user = await User.findById(req.user.id).select("-password");
+    
+    if (!user) {
+      return next(new AppError("User not found", 404));
+    }
 
-    return sendSuccess(res, user, "Profile fetched successfully");
+    return successResponse(res, user, "Profile fetched successfully");
   } catch (err) {
-    return sendError(res, err.message, 500);
+    next(err);
   }
 };
+
 
 // ======================
 // Google Login
@@ -127,3 +115,15 @@ export const googleLogin = async (req, res) => {
     return sendError(res, err.message, 500);
   }
 };
+
+// Export as default object
+export default {
+  signup,
+  login,
+  getProfile,
+  googleLogin
+};
+
+
+
+

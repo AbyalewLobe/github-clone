@@ -6,6 +6,8 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import routes from "./routes/index.js";
 import authRoutes from "./routes/auth.routes.js";
+import globalErrorHandler from './middleware/errorHandler.js';
+
 
 dotenv.config();
 
@@ -18,12 +20,16 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Routes
-app.use("/api/auth", authRoutes);
 app.use("/api", routes);
+
+app.use("/api/auth", authRoutes);
+
 
 // Root test route
 app.get("/", (req, res) => {
   res.send("🚀 GitHub Clone API is running...");
 });
+
+app.use(globalErrorHandler);
 
 export default app;
