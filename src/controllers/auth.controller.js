@@ -1,48 +1,131 @@
-
-import User from "../models/User.js"; // Add .js extension
+// src/controllers/auth.controller.js
+import User from "../models/User.js";
 import AppError from "../utils/appError.js";
 import { successResponse } from "../utils/response.js";
 import { hashPassword, comparePassword } from "../utils/hash.js";
 import { signToken } from "../utils/jwt.js";
+import crypto from "crypto";
+import nodemailer from "nodemailer";
+import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 
-// Helper to create and send token
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// ==============================
+// 📧 Nodemailer Transporter
+// ==============================
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+// ==============================
+// 🔐 Helper: Create and Send JWT
+// ==============================
 const createSendToken = (user, statusCode, res) => {
   const token = signToken({ id: user._id });
 
   res.cookie("jwt", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
-  return successResponse(res, { user, token }, "Authentication successful", statusCode);
+  const safeUser = user.toObject();
+  delete safeUser.password;
+
+  return successResponse(
+    res,
+    { user: safeUser, token },
+    "Authentication successful",
+    statusCode
+  );
 };
 
-// Signup
+// ==============================
+// 📝 Signup + Email Verification
+// ==============================
 export const signup = async (req, res, next) => {
   try {
-    const { username, email, password } = req.body;
+    let { username, email, password } = req.body;
+
+    // Normalize input
+    username = username.trim();
+    email = email.trim().toLowerCase();
+
     const hashedPassword = await hashPassword(password);
+    const verificationToken = crypto.randomBytes(32).toString("hex");
 
     const newUser = await User.create({
       username,
       email,
       password: hashedPassword,
+      emailVerificationToken: verificationToken,
+      isVerified: false,
     });
 
-    createSendToken(newUser, 201, res);
+    const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+    await transporter.sendMail({
+      from: `"Support" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Verify your email",
+      html: `<p>Thanks for signing up! Please verify your email by clicking the link below:</p>
+             <a href="${verifyURL}">${verifyURL}</a>`,
+    });
+
+    return successResponse(
+      res,
+      { message: "Signup successful. Please check your email to verify your account." },
+      "Signup successful",
+      201
+    );
+  } catch (err) {
+    // Handle duplicate key errors
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+      return res.status(400).json({
+        success: false,
+        message: `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`,
+      });
+    }
+    next(err);
+  }
+};
+
+// ==============================
+// ✉️ Verify Email Token
+// ==============================
+export const verifyEmail = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const user = await User.findOne({ emailVerificationToken: token });
+    if (!user) return next(new AppError("Invalid or expired verification token", 400));
+
+    user.isVerified = true;
+    user.emailVerificationToken = undefined;
+    await user.save();
+
+    return successResponse(res, {}, "Email verified successfully. You can now log in.");
   } catch (err) {
     next(err);
   }
 };
 
-// Login
+// ==============================
+// 🔐 Login (with verification check)
+// ==============================
 export const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
+    email = email.trim().toLowerCase();
 
     const user = await User.findOne({ email }).select("+password");
     if (!user) return next(new AppError("Invalid email or password", 401));
+
+    if (!user.isVerified) return next(new AppError("Please verify your email before logging in", 403));
 
     const valid = await comparePassword(password, user.password);
     if (!valid) return next(new AppError("Invalid email or password", 401));
@@ -53,17 +136,13 @@ export const login = async (req, res, next) => {
   }
 };
 
-// ======================
-// Get Profile (Protected)
-// ======================
+// ==============================
+// 👤 Get Profile (Protected)
+// ==============================
 export const getProfile = async (req, res, next) => {
   try {
-    // req.user is set by the protect middleware
     const user = await User.findById(req.user.id).select("-password");
-    
-    if (!user) {
-      return next(new AppError("User not found", 404));
-    }
+    if (!user) return next(new AppError("User not found", 404));
 
     return successResponse(res, user, "Profile fetched successfully");
   } catch (err) {
@@ -71,14 +150,71 @@ export const getProfile = async (req, res, next) => {
   }
 };
 
+// ==============================
+// 📧 Forgot Password
+// ==============================
+export const forgotPassword = async (req, res, next) => {
+  try {
+    let { email } = req.body;
+    email = email.trim().toLowerCase();
 
-// ======================
-// Google Login
-// ======================
-export const googleLogin = async (req, res) => {
+    const user = await User.findOne({ email });
+    if (!user) return next(new AppError("No user found with that email", 404));
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+    await user.save();
+
+    const resetURL = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+    await transporter.sendMail({
+      from: `"Support" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Password Reset",
+      html: `<p>You requested to reset your password. Click the link below to reset:</p>
+             <a href="${resetURL}">${resetURL}</a>
+             <p>If you didn't request this, you can safely ignore this email.</p>`,
+    });
+
+    return successResponse(res, {}, "Password reset link sent to your email");
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ==============================
+// 🔁 Reset Password
+// ==============================
+export const resetPassword = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) return next(new AppError("Invalid or expired reset token", 400));
+
+    user.password = await hashPassword(newPassword);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    return successResponse(res, {}, "Password reset successful");
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ==============================
+// 🌐 Google Login
+// ==============================
+export const googleLogin = async (req, res, next) => {
   try {
     const { token } = req.body;
-    if (!token) return sendError(res, "Google ID token is required", 400);
+    if (!token) return next(new AppError("Google ID token is required", 400));
 
     const ticket = await client.verifyIdToken({
       idToken: token,
@@ -86,18 +222,29 @@ export const googleLogin = async (req, res) => {
     });
 
     const { sub, email, name, picture } = ticket.getPayload();
-
-    let user = await User.findOne({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+    let user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
+      const baseUsername = email.split("@")[0].trim();
+      let username = baseUsername;
+      let count = 1;
+
+      // Ensure unique username
+      while (await User.findOne({ username })) {
+        username = `${baseUsername}${count}`;
+        count++;
+      }
+
       user = await User.create({
-        username: email.split("@")[0],
-        email,
+        username,
+        email: normalizedEmail,
         name,
         avatar_url: picture,
         googleId: sub,
         authProvider: "google",
-        password_hash: "", // Google users don’t need passwords
+        isVerified: true,
+        password: "",
       });
     }
 
@@ -108,22 +255,23 @@ export const googleLogin = async (req, res) => {
     );
 
     const safeUser = user.toObject();
-    delete safeUser.password_hash;
+    delete safeUser.password;
 
-    return sendSuccess(res, { user: safeUser, token: appToken }, "Google login successful");
+    return successResponse(res, { user: safeUser, token: appToken }, "Google login successful");
   } catch (err) {
-    return sendError(res, err.message, 500);
+    return next(new AppError(err.message, 500));
   }
 };
 
-// Export as default object
+// ==============================
+// 📤 Export all controllers
+// ==============================
 export default {
   signup,
+  verifyEmail,
   login,
   getProfile,
-  googleLogin
+  forgotPassword,
+  resetPassword,
+  googleLogin,
 };
-
-
-
-

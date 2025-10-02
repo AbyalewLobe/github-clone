@@ -10,17 +10,23 @@ const userSchema = new mongoose.Schema(
     bio: { type: String },
     avatar_url: { type: String },
 
-    // Fields for social login
     authProvider: {
       type: String,
       enum: ["local", "google"],
       default: "local",
     },
-    googleId: { type: String }, // store Google’s user ID
+    googleId: { type: String },
+
+    // 📩 Email verification
+    isVerified: { type: Boolean, default: false },
+    emailVerificationToken: { type: String },
+
+    // 🔐 Forgot password
+    resetPasswordToken: { type: String },
+    resetPasswordExpires: { type: Date },
   },
   { timestamps: true }
 );
 
-// Default export for ES modules
 const User = mongoose.model("User", userSchema);
 export default User;
