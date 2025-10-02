@@ -8,6 +8,7 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
+import sendEmail from "../utils/Email.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -56,32 +57,76 @@ export const signup = async (req, res, next) => {
     username = username.trim();
     email = email.trim().toLowerCase();
 
+    // Hash the password
     const hashedPassword = await hashPassword(password);
-    const verificationToken = crypto.randomBytes(32).toString("hex");
 
+    // Generate email verification token
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    // Create user
     const newUser = await User.create({
       username,
       email,
       password: hashedPassword,
-      emailVerificationToken: verificationToken,
+      emailVerificationToken: hashedToken,
+      emailVerificationTokenExpires: Date.now() + 60 * 60 * 1000, // 1 hour
       isVerified: false,
     });
 
-    const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
-    await transporter.sendMail({
-      from: `"Support" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Verify your email",
-      html: `<p>Thanks for signing up! Please verify your email by clicking the link below:</p>
-             <a href="${verifyURL}">${verifyURL}</a>`,
-    });
+    // Prepare verification email
+    const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${rawToken}`;
+    const subject = "Verify Your Email";
+    const message = `Thanks for signing up! Please verify your email by clicking the link: ${verifyURL}`;
+    const htmlMessage = `
+      <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+        <h2>Welcome, ${newUser.username}! 🎯</h2>
+        <p>
+          Thanks for signing up. Please verify your email by clicking the button
+          below:
+        </p>
+        <a
+          href="${verifyUrl}"
+          style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;"
+        >
+          Verify Email
+        </a>
+        <p>
+          If the button doesn't work, copy and paste this link in your browser:
+        </p>
+        <p>
+          <a href="${verifyUrl}">${verifyUrl}</a>
+        </p>
+      </div>`;
 
-    return successResponse(
-      res,
-      { message: "Signup successful. Please check your email to verify your account." },
-      "Signup successful",
-      201
-    );
+    // Send email
+    try {
+      await sendEmail({
+        email: newUser.email,
+        subject,
+        message,
+        html: htmlMessage,
+      });
+
+      return res.status(201).json({
+        status: "success",
+        message:
+          "User created! Please check your email to verify your account.",
+      });
+    } catch (err) {
+      // If email fails, delete the created user
+      await User.findByIdAndDelete(newUser._id);
+      console.error("Error sending verification email:", err);
+      return next(
+        new AppError(
+          "There was an error sending the email. Try again later.",
+          500
+        )
+      );
+    }
   } catch (err) {
     // Handle duplicate key errors
     if (err.code === 11000) {
@@ -101,14 +146,25 @@ export const signup = async (req, res, next) => {
 export const verifyEmail = async (req, res, next) => {
   try {
     const { token } = req.params;
-    const user = await User.findOne({ emailVerificationToken: token });
-    if (!user) return next(new AppError("Invalid or expired verification token", 400));
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await User.findOne({
+      emailVerificationToken: hashedToken,
+      emailVerificationTokenExpires: { $gt: Date.now() },
+    });
+    if (!user)
+      return next(new AppError("Invalid or expired verification token", 400));
 
     user.isVerified = true;
     user.emailVerificationToken = undefined;
+    user.emailVerificationTokenExpires = undefined;
+
     await user.save();
 
-    return successResponse(res, {}, "Email verified successfully. You can now log in.");
+    return successResponse(
+      res,
+      {},
+      "Email verified successfully. You can now log in."
+    );
   } catch (err) {
     next(err);
   }
@@ -125,7 +181,10 @@ export const login = async (req, res, next) => {
     const user = await User.findOne({ email }).select("+password");
     if (!user) return next(new AppError("Invalid email or password", 401));
 
-    if (!user.isVerified) return next(new AppError("Please verify your email before logging in", 403));
+    if (!user.isVerified)
+      return next(
+        new AppError("Please verify your email before logging in", 403)
+      );
 
     const valid = await comparePassword(password, user.password);
     if (!valid) return next(new AppError("Invalid email or password", 401));
@@ -257,7 +316,11 @@ export const googleLogin = async (req, res, next) => {
     const safeUser = user.toObject();
     delete safeUser.password;
 
-    return successResponse(res, { user: safeUser, token: appToken }, "Google login successful");
+    return successResponse(
+      res,
+      { user: safeUser, token: appToken },
+      "Google login successful"
+    );
   } catch (err) {
     return next(new AppError(err.message, 500));
   }

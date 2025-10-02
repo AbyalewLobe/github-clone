@@ -20,6 +20,7 @@ const userSchema = new mongoose.Schema(
     // 📩 Email verification
     isVerified: { type: Boolean, default: false },
     emailVerificationToken: { type: String },
+    emailVerificationTokenExpires: { type: Date },
 
     // 🔐 Forgot password
     resetPasswordToken: { type: String },
