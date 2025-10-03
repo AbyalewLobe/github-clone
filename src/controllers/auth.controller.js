@@ -51,7 +51,7 @@ const createSendToken = (user, statusCode, res) => {
 // ==============================
 export const signup = async (req, res, next) => {
   try {
-    let { username, email, password } = req.body;
+    let { username, email, name, password } = req.body;
 
     // Normalize input
     username = username.trim();
@@ -71,6 +71,7 @@ export const signup = async (req, res, next) => {
     const newUser = await User.create({
       username,
       email,
+      name,
       password: hashedPassword,
       emailVerificationToken: hashedToken,
       emailVerificationTokenExpires: Date.now() + 60 * 60 * 1000, // 1 hour
@@ -89,7 +90,7 @@ export const signup = async (req, res, next) => {
           below:
         </p>
         <a
-          href="${verifyUrl}"
+          href="${verifyURL}"
           style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;"
         >
           Verify Email
@@ -98,7 +99,7 @@ export const signup = async (req, res, next) => {
           If the button doesn't work, copy and paste this link in your browser:
         </p>
         <p>
-          <a href="${verifyUrl}">${verifyUrl}</a>
+          <a href="${verifyURL}">${verifyURL}</a>
         </p>
       </div>`;
 
@@ -146,14 +147,24 @@ export const signup = async (req, res, next) => {
 export const verifyEmail = async (req, res, next) => {
   try {
     const { token } = req.params;
+
+    // Convert raw token from URL into hashed
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    // Search for user with hashed token + valid expiry
     const user = await User.findOne({
       emailVerificationToken: hashedToken,
       emailVerificationTokenExpires: { $gt: Date.now() },
     });
-    if (!user)
-      return next(new AppError("Invalid or expired verification token", 400));
 
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired verification token",
+      });
+    }
+
+    // Update user as verified
     user.isVerified = true;
     user.emailVerificationToken = undefined;
     user.emailVerificationTokenExpires = undefined;

@@ -24,7 +24,7 @@ build/
 
 # VSCode
 .vscode/
-
+/data
 # Optional: ignore lock files if you don’t want them versioned
 # package-lock.json
 # yarn.lock

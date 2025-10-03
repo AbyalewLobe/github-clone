@@ -1,33 +1,25 @@
-// src/models/User.js
 import mongoose from "mongoose";
+const { Schema } = mongoose;
 
-const userSchema = new mongoose.Schema(
+const UserSchema = new Schema(
   {
-    username: { type: String, required: true, unique: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String }, // empty if Google user
+    username: { type: String, required: true, unique: true, index: true },
+    email: { type: String, required: true, unique: true, index: true },
+    password: { type: String, required: true, select: false }, // hide by default
     name: { type: String },
     bio: { type: String },
-    avatar_url: { type: String },
-
-    authProvider: {
-      type: String,
-      enum: ["local", "google"],
-      default: "local",
-    },
-    googleId: { type: String },
-
-    // 📩 Email verification
+    avatarUrl: { type: String },
+    role: { type: String, enum: ["user", "admin"], default: "user" },
+    settings: { type: Object },
     isVerified: { type: Boolean, default: false },
     emailVerificationToken: { type: String },
     emailVerificationTokenExpires: { type: Date },
-
-    // 🔐 Forgot password
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
+    googleId: { type: String },
+    authProvider: { type: String, default: "local" },
   },
   { timestamps: true }
 );
 
-const User = mongoose.model("User", userSchema);
-export default User;
+export default mongoose.model("User", UserSchema);
