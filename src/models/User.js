@@ -8,7 +8,7 @@ const UserSchema = new Schema(
     password: { type: String, required: true, select: false }, // hide by default
     name: { type: String },
     bio: { type: String },
-    avatarUrl: { type: String },
+    avatarUrl: { type: String }, // ✅ Cloudinary image URL will be stored here
     role: { type: String, enum: ["user", "admin"], default: "user" },
     settings: { type: Object },
     isVerified: { type: Boolean, default: false },

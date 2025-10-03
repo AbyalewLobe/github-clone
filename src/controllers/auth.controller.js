@@ -49,16 +49,32 @@ const createSendToken = (user, statusCode, res) => {
 // ==============================
 // 📝 Signup + Email Verification
 // ==============================
+import cloudinary from "../config/cloudinary.js";
+
+// ==============================
+// 📝 Signup + Email Verification (with Role + Avatar Upload)
+// ==============================
 export const signup = async (req, res, next) => {
   try {
-    let { username, email, name, password } = req.body;
+    let { username, email, name, password, role, avatar } = req.body;
 
     // Normalize input
     username = username.trim();
     email = email.trim().toLowerCase();
+    role = role?.trim().toLowerCase() || "user";
 
-    // Hash the password
+    // Hash password
     const hashedPassword = await hashPassword(password);
+
+    // Optional: upload avatar if provided (e.g., base64 or URL)
+    let avatarUrl = null;
+    if (avatar) {
+      const uploadRes = await cloudinary.uploader.upload(avatar, {
+        folder: "avatars",
+        transformation: [{ width: 300, height: 300, crop: "fill" }],
+      });
+      avatarUrl = uploadRes.secure_url;
+    }
 
     // Generate email verification token
     const rawToken = crypto.randomBytes(32).toString("hex");
@@ -73,6 +89,8 @@ export const signup = async (req, res, next) => {
       email,
       name,
       password: hashedPassword,
+      role,
+      avatarUrl,
       emailVerificationToken: hashedToken,
       emailVerificationTokenExpires: Date.now() + 60 * 60 * 1000, // 1 hour
       isVerified: false,
@@ -85,22 +103,13 @@ export const signup = async (req, res, next) => {
     const htmlMessage = `
       <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
         <h2>Welcome, ${newUser.username}! 🎯</h2>
-        <p>
-          Thanks for signing up. Please verify your email by clicking the button
-          below:
-        </p>
+        <p>Please verify your email by clicking the button below:</p>
         <a
           href="${verifyURL}"
           style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;"
         >
           Verify Email
         </a>
-        <p>
-          If the button doesn't work, copy and paste this link in your browser:
-        </p>
-        <p>
-          <a href="${verifyURL}">${verifyURL}</a>
-        </p>
       </div>`;
 
     // Send email
@@ -114,19 +123,13 @@ export const signup = async (req, res, next) => {
 
       return res.status(201).json({
         status: "success",
-        message:
-          "User created! Please check your email to verify your account.",
+        message: "User created! Please check your email to verify your account.",
       });
     } catch (err) {
       // If email fails, delete the created user
       await User.findByIdAndDelete(newUser._id);
       console.error("Error sending verification email:", err);
-      return next(
-        new AppError(
-          "There was an error sending the email. Try again later.",
-          500
-        )
-      );
+      return next(new AppError("There was an error sending the email. Try again later.", 500));
     }
   } catch (err) {
     // Handle duplicate key errors
@@ -140,6 +143,7 @@ export const signup = async (req, res, next) => {
     next(err);
   }
 };
+
 
 // ==============================
 // ✉️ Verify Email Token
