@@ -75,7 +75,9 @@ export const listUsers = async (req, res, next) => {
     const [total, users] = await Promise.all([
       User.countDocuments(filter),
       User.find(filter)
-        .select("-password")
+        .select(
+          "-password password -emailVerificationToken -emailVerificationTokenExpires -createdAt -updatedAt"
+        )
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -99,14 +101,7 @@ export const updateUser = async (req, res, next) => {
     }
 
     const updates = {};
-    const allowedFields = [
-      "name",
-      "bio",
-      "avatarUrl",
-      "email",
-      "username",
-      "settings",
-    ];
+    const allowedFields = ["name", "bio", "avatarUrl", "username", "settings"];
 
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
@@ -129,7 +124,9 @@ export const updateUser = async (req, res, next) => {
     const user = await User.findOneAndUpdate({ username }, updates, {
       new: true,
       runValidators: true,
-    }).select("-password");
+    }).select(
+      "-password password -emailVerificationToken -emailVerificationTokenExpires -createdAt -updatedAt"
+    );
 
     if (!user) return next(new AppError("User not found", 404));
 
@@ -168,10 +165,36 @@ export const deleteUser = async (req, res, next) => {
   }
 };
 
+//change user role - admin only
+export const changeUserRole = async (req, res, next) => {
+  try {
+    const { username } = req.params;
+    const { role } = req.body;
+    if (req.user.role !== "admin") {
+      return next(new AppError("Forbidden: admin only", 403));
+    }
+    if (!["user", "admin"].includes(role)) {
+      return next(new AppError("Invalid role", 400));
+    }
+    const user = await User.findOneAndUpdate(
+      { username },
+      { role },
+      { new: true }
+    ).select(
+      "-password -emailVerificationToken -emailVerificationTokenExpires -createdAt -updatedAt"
+    );
+    if (!user) return next(new AppError("User not found", 404));
+    return successResponse(res, user, "User role updated successfully");
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default {
   getFollowers,
   getFollowing,
   listUsers,
   updateUser,
   deleteUser,
+  changeUserRole,
 };
