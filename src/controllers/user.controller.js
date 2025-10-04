@@ -4,71 +4,7 @@ import Follower from "../models/Follower.js";
 import AppError from "../utils/appError.js";
 import { successResponse } from "../utils/response.js";
 import bcrypt from "bcryptjs";
-import { v2 as cloudinary } from "cloudinary";
-
-// ✅ Make sure you have Cloudinary env vars set in .env
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-// 🟢 SIGNUP with avatar upload
-export const signup = async (req, res, next) => {
-  try {
-    const { username, email, password, name, bio, role } = req.body;
-
-    if (!username || !email || !password) {
-      return next(
-        new AppError("Username, email, and password are required", 400)
-      );
-    }
-
-    // ✅ Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // ✅ Handle avatar upload (if provided as Base64 string or URL)
-    let avatarUrl = "";
-    if (req.body.avatar) {
-      const uploadResult = await cloudinary.uploader.upload(req.body.avatar, {
-        folder: "avatars",
-        public_id: `${username}-avatar`,
-        overwrite: true,
-      });
-      avatarUrl = uploadResult.secure_url;
-    }
-
-    // ✅ Create new user
-    const newUser = await User.create({
-      username,
-      email,
-      password: hashedPassword,
-      name,
-      bio,
-      role, // will default to 'user' if not provided
-      avatarUrl,
-    });
-
-    return successResponse(
-      res,
-      {
-        id: newUser._id,
-        username: newUser.username,
-        email: newUser.email,
-        avatarUrl: newUser.avatarUrl,
-        role: newUser.role,
-      },
-      "User registered successfully"
-    );
-  } catch (err) {
-    // Handle duplicate key error
-    if (err.code === 11000) {
-      const key = Object.keys(err.keyPattern)[0];
-      return next(new AppError(`${key} already exists`, 409));
-    }
-    next(err);
-  }
-};
+import cloudinary from "../config/cloudinary.js";
 
 // 📌 GET Following
 export const getFollowing = async (req, res, next) => {
@@ -233,7 +169,6 @@ export const deleteUser = async (req, res, next) => {
 };
 
 export default {
-  signup,
   getFollowers,
   getFollowing,
   listUsers,

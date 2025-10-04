@@ -9,6 +9,7 @@ import nodemailer from "nodemailer";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import sendEmail from "../utils/Email.js";
+import cloudinary from "../config/cloudinary.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -47,11 +48,6 @@ const createSendToken = (user, statusCode, res) => {
 };
 
 // ==============================
-// 📝 Signup + Email Verification
-// ==============================
-import cloudinary from "../config/cloudinary.js";
-
-// ==============================
 // 📝 Signup + Email Verification (with Role + Avatar Upload)
 // ==============================
 export const signup = async (req, res, next) => {
@@ -65,15 +61,26 @@ export const signup = async (req, res, next) => {
 
     // Hash password
     const hashedPassword = await hashPassword(password);
-
+    console.log("CLOUDNARY_NAME", process.env.CLOUDINARY_CLOUD_NAME);
+    console.log("CLOUDNARY_KEY", process.env.CLOUDINARY_API_KEY);
+    console.log("CLOUDNARY_SECRET", process.env.CLOUDINARY_API_SECRET);
     // Optional: upload avatar if provided (e.g., base64 or URL)
     let avatarUrl = null;
     if (avatar) {
-      const uploadRes = await cloudinary.uploader.upload(avatar, {
-        folder: "avatars",
-        transformation: [{ width: 300, height: 300, crop: "fill" }],
-      });
-      avatarUrl = uploadRes.secure_url;
+      try {
+        const uploadRes = await cloudinary.uploader.upload(avatar, {
+          folder: "avatars",
+          transformation: [{ width: 300, height: 300, crop: "fill" }],
+        });
+        avatarUrl = uploadRes.secure_url;
+      } catch (err) {
+        console.error("Cloudinary upload error:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Avatar upload failed",
+          error: err.message || err,
+        });
+      }
     }
 
     // Generate email verification token
@@ -123,13 +130,19 @@ export const signup = async (req, res, next) => {
 
       return res.status(201).json({
         status: "success",
-        message: "User created! Please check your email to verify your account.",
+        message:
+          "User created! Please check your email to verify your account.",
       });
     } catch (err) {
       // If email fails, delete the created user
       await User.findByIdAndDelete(newUser._id);
       console.error("Error sending verification email:", err);
-      return next(new AppError("There was an error sending the email. Try again later.", 500));
+      return next(
+        new AppError(
+          "There was an error sending the email. Try again later.",
+          500
+        )
+      );
     }
   } catch (err) {
     // Handle duplicate key errors
@@ -143,7 +156,6 @@ export const signup = async (req, res, next) => {
     next(err);
   }
 };
-
 
 // ==============================
 // ✉️ Verify Email Token

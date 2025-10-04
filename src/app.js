@@ -1,15 +1,16 @@
 // src/app.js
+import dotenv from "dotenv";
+
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
-import dotenv from "dotenv";
 import routes from "./routes/index.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import globalErrorHandler from "./middleware/errorHandler.js";
-
-dotenv.config();
 
 const app = express();
 
