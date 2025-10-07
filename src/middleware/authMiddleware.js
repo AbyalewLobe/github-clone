@@ -18,7 +18,7 @@ const authMiddleware = async (req, res, next) => {
 };
 
 
-export const protect = async (req, res, next) => {
+const protect = async (req, res, next) => {
   let token;
 
   // Get token from header or cookie
@@ -46,4 +46,4 @@ export const protect = async (req, res, next) => {
 };
 
 
-export default {authMiddleware,protect};
+export {authMiddleware,protect};
