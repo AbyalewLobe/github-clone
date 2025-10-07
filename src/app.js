@@ -10,6 +10,7 @@ import cookieParser from "cookie-parser";
 import routes from "./routes/index.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import repoRouters from "./routes/repo.routes.js";
 import globalErrorHandler from "./middleware/errorHandler.js";
 
 const app = express();
@@ -28,6 +29,7 @@ app.use("/api", routes);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/repos", repoRouters);
 
 // Root test route
 app.get("/", (req, res) => {
