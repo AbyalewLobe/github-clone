@@ -207,6 +207,43 @@ export const getByUsername = async (req, res) => {
   }
 };
 
+export const unfollow = async (req, res) => {
+  try {
+    const { username } = req.params;
+    const currentUserId = req.user._id; // from protect middleware
+
+    // Find the user to unfollow
+    const targetUser = await User.findOne({ username });
+    if (!targetUser) {
+      return errorResponse(res, "User not found", 404);
+    }
+
+    // Prevent unfollowing self
+    if (targetUser._id.toString() === currentUserId.toString()) {
+      return errorResponse(res, "You cannot unfollow yourself", 400);
+    }
+
+    // Check if not following already
+    if (!targetUser.followers.includes(currentUserId)) {
+      return errorResponse(res, "You are not following this user", 400);
+    }
+
+    // Remove from followers and following
+    await Follower.findByIdAndUpdate(currentUserId, {
+      $pull: { following: targetUser._id },
+    });
+    await Follower.findByIdAndUpdate(targetUser._id, {
+      $pull: { followers: currentUserId },
+    });
+
+    return successResponse(res, null, `You have unfollowed ${username}`);
+  } catch (error) {
+    console.error("Error unfollowing user:", error);
+    return errorResponse(res, "Server error", 500);
+  }
+};
+
+
 export default {
   getFollowers,
   getFollowing,
@@ -215,4 +252,5 @@ export default {
   deleteUser,
   changeUserRole,
   getByUsername,
+  unfollow,
 };

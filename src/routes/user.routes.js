@@ -3,44 +3,46 @@ import express from "express";
 import userController from "../controllers/user.controller.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 // import {protect} from "./middleware/authMiddleware.js"
+import { protect } from "../middleware/authMiddleware.js";
 
 const userRoutes = express.Router();
 
 // 🟠 Admin only: list users
-userRoutes.get("/", authMiddleware.protect, userController.listUsers);
+userRoutes.get("/", protect, userController.listUsers);
 
 // 🟠 Self or Admin: update user
 userRoutes.patch(
   "/:username",
-  authMiddleware.protect,
+  protect,
   userController.updateUser
 );
 
 // 🟠 Self or Admin: delete user
 userRoutes.delete(
   "/:username",
-  authMiddleware.protect,
+  protect,
   userController.deleteUser
 );
 // 🟠 Admin only: change user role
 userRoutes.patch(
   "/:username/role",
-  authMiddleware.protect,
+  protect,
   userController.changeUserRole
 );
 
 // 👥 Followers / Following
 userRoutes.get(
   "/:username/following",
-  authMiddleware.protect,
+  protect,
   userController.getFollowing
 );
 
 userRoutes.get(
   "/:username/followers",
-  authMiddleware.protect,
+  protect,
   userController.getFollowers
 );
-userRoutes.get("/:username/",userController.getByUsername)
+userRoutes.get("/:username/", userController.getByUsername);
+userRoutes.delete("/:username/unfollow", protect, userController.unfollow);
 
 export default userRoutes;
