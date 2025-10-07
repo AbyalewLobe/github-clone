@@ -11,11 +11,13 @@ import cookieParser from "cookie-parser";
 import routes from "./routes/index.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
+
 import repoRoutes from "./routes/repo.routes.js";
 import issueRoutes from "./routes/issue.routes.js";
 import commentRoutes from "./routes/comment.routes.js";
 
 // Middleware
+import branchRoutes from "./routes/branch.routes.js";
 import globalErrorHandler from "./middleware/errorHandler.js";
 import pullRequestRouters from "./routes/pullRequest.routes.js";
 
@@ -43,6 +45,9 @@ app.use("/api/repos/:owner/:repo/comments", commentRoutes);
 
 
 app.use("/api/repos", pullRequestRouters);
+
+app.use("/api/repos/:owner/:repo/branches", branchRoutes);
+
 
 // Root test route
 app.get("/", (req, res) => {
