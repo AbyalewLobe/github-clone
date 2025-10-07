@@ -2,7 +2,7 @@
 import User from "../models/User.js";
 import Follower from "../models/Follower.js";
 import AppError from "../utils/appError.js";
-import { successResponse } from "../utils/response.js";
+import { successResponse ,errorResponse} from "../utils/response.js";
 import bcrypt from "bcryptjs";
 import cloudinary from "../config/cloudinary.js";
 
@@ -190,6 +190,23 @@ export const changeUserRole = async (req, res, next) => {
   }
 };
 
+export const getByUsername = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const user = await User.findOne({ username }).select("-password");
+
+    if (!user) {
+      return errorResponse(res, "User not found", 404);
+    }
+
+    return successResponse(res, user, "User fetched successfully");
+  } catch (error) {
+    console.error("Error fetching user by username:", error);
+    return errorResponse(res, "Server error", 500);
+  }
+};
+
 export default {
   getFollowers,
   getFollowing,
@@ -197,4 +214,5 @@ export default {
   updateUser,
   deleteUser,
   changeUserRole,
+  getByUsername,
 };
