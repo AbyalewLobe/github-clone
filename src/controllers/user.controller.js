@@ -207,41 +207,78 @@ export const getByUsername = async (req, res) => {
   }
 };
 
-export const unfollow = async (req, res) => {
+
+
+
+export const follow = async (req, res) => {
   try {
     const { username } = req.params;
-    const currentUserId = req.user._id; // from protect middleware
 
-    // Find the user to unfollow
+    // 1️⃣ Find the target user
     const targetUser = await User.findOne({ username });
     if (!targetUser) {
       return errorResponse(res, "User not found", 404);
     }
 
-    // Prevent unfollowing self
-    if (targetUser._id.toString() === currentUserId.toString()) {
+    // 2️⃣ Prevent self-follow
+    if (targetUser._id.equals(req.user._id)) {
+      return errorResponse(res, "You cannot follow yourself", 400);
+    }
+
+    // 3️⃣ Check if already following
+    const existingFollow = await Follower.findOne({
+      follower: req.user._id,
+      following: targetUser._id,
+    });
+
+    if (existingFollow) {
+      return errorResponse(res, "Already following this user", 400);
+    }
+
+    // 4️⃣ Create new follow record
+    await Follower.create({
+      follower: req.user._id,
+      following: targetUser._id,
+    });
+
+    return successResponse(res, {}, "Followed user successfully", 200);
+  } catch (error) {
+    console.error("Error following user:", error);
+    return errorResponse(res, "Server error", 500, error);
+  }
+};
+;
+
+
+export const unfollow = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const targetUser = await User.findOne({ username });
+    if (!targetUser) {
+      return errorResponse(res, "User not found", 404);
+    }
+
+    if (targetUser._id.equals(req.user._id)) {
       return errorResponse(res, "You cannot unfollow yourself", 400);
     }
 
-    // Check if not following already
-    if (!targetUser.followers.includes(currentUserId)) {
+    const deletedFollow = await Follower.findOneAndDelete({
+      follower: req.user._id,
+      following: targetUser._id,
+    });
+
+    if (!deletedFollow) {
       return errorResponse(res, "You are not following this user", 400);
     }
 
-    // Remove from followers and following
-    await Follower.findByIdAndUpdate(currentUserId, {
-      $pull: { following: targetUser._id },
-    });
-    await Follower.findByIdAndUpdate(targetUser._id, {
-      $pull: { followers: currentUserId },
-    });
-
-    return successResponse(res, null, `You have unfollowed ${username}`);
+    return successResponse(res, {}, "Unfollowed user successfully", 200);
   } catch (error) {
     console.error("Error unfollowing user:", error);
-    return errorResponse(res, "Server error", 500);
+    return errorResponse(res, "Server error", 500, error);
   }
 };
+
 
 
 export default {
@@ -252,5 +289,6 @@ export default {
   deleteUser,
   changeUserRole,
   getByUsername,
+  follow,
   unfollow,
 };

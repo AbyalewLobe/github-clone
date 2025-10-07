@@ -43,6 +43,7 @@ userRoutes.get(
   userController.getFollowers
 );
 userRoutes.get("/:username/", userController.getByUsername);
+userRoutes.post("/:username/follow", protect, userController.follow);
 userRoutes.delete("/:username/unfollow", protect, userController.unfollow);
 
 export default userRoutes;
