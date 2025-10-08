@@ -1,30 +1,35 @@
 import express from "express";
-import authMiddleware from "../middleware/authMiddleware.js";
+import { protect, authorize } from "../middleware/authMiddleware.js";
 import pullRequestController from "../controllers/pullRequest.controller.js";
 
 const pullRequestRouter = express.Router({ mergeParams: true });
 
+// List and create pull requests
 pullRequestRouter
   .route("/:owner/:repo/pulls")
-  .get(authMiddleware.protect, pullRequestController.listPullRequests)
-  .post(authMiddleware.protect, pullRequestController.createPullRequest);
+  .get(protect, pullRequestController.listPullRequests)
+  .post(protect, pullRequestController.createPullRequest);
+
+// Pull request details, update
 pullRequestRouter
   .route("/:owner/:repo/pulls/:number")
-  .get(authMiddleware.protect, pullRequestController.getPullRequestDetails)
-  .patch(authMiddleware.protect, pullRequestController.updatePullRequest);
+  .get(protect, pullRequestController.getPullRequestDetails)
+  .patch(protect, pullRequestController.updatePullRequest);
+
+// Merge pull request
 pullRequestRouter
   .route("/:owner/:repo/pulls/:number/merge")
-  .post(authMiddleware.protect, pullRequestController.mergePullRequest);
+  .post(protect, pullRequestController.mergePullRequest);
+
+// Pull request reviews
 pullRequestRouter
   .route("/:owner/:repo/pulls/:number/reviews")
-  .post(authMiddleware.protect, pullRequestController.addPullRequestReview)
-  .get(authMiddleware.protect, pullRequestController.listPullRequestReviews);
+  .post(protect, pullRequestController.addPullRequestReview)
+  .get(protect, pullRequestController.listPullRequestReviews);
+
 pullRequestRouter
   .route("/:owner/:repo/pulls/:number/reviews/:id")
-  .patch(authMiddleware.protect, pullRequestController.updatePullRequestReview)
-  .delete(
-    authMiddleware.protect,
-    pullRequestController.deletePullRequestReview
-  );
+  .patch(protect, pullRequestController.updatePullRequestReview)
+  .delete(protect, pullRequestController.deletePullRequestReview);
 
 export default pullRequestRouter;

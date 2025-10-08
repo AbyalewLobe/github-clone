@@ -1,7 +1,7 @@
 // src/routes/comment.routes.js
 import express from "express";
 import commentController from "../controllers/comment.controller.js";
-import { authMiddleware } from "../middleware/authMiddleware.js";
+import { protect, authorize } from "../middleware/authMiddleware.js";
 
 const commentRoutes = express.Router({ mergeParams: true });
 
@@ -9,8 +9,7 @@ const commentRoutes = express.Router({ mergeParams: true });
 commentRoutes.get("/", commentController.list);
 
 // Authenticated routes
-commentRoutes.use(authMiddleware.authMiddleware);
-commentRoutes.use(authMiddleware);
+commentRoutes.use(protect);
 
 // Add a comment to an issue
 commentRoutes.post("/", commentController.create);
@@ -18,7 +17,7 @@ commentRoutes.post("/", commentController.create);
 // Update a comment
 commentRoutes.patch("/:commentId", commentController.update);
 
-// Delete a comment
-commentRoutes.delete("/:commentId", commentController.remove);
+// Delete a comment (admin only)
+commentRoutes.delete("/:commentId", authorize("admin"), commentController.remove);
 
 export default commentRoutes;

@@ -1,12 +1,7 @@
 // src/routes/user.routes.js
 import express from "express";
 import userController from "../controllers/user.controller.js";
-
-import authMiddleware from "../middleware/authMiddleware.js";
-// import {protect} from "./middleware/authMiddleware.js"
- 
-import { protect } from "../middleware/authMiddleware.js";
- 
+import { authMiddleware, protect } from "../middleware/authMiddleware.js";
 
 const userRoutes = express.Router();
 
@@ -23,21 +18,10 @@ userRoutes.delete("/:username", protect, userController.deleteUser);
 userRoutes.patch("/:username/role", protect, userController.changeUserRole);
 
 // 👥 Followers / Following
- 
-userRoutes.get(
-  "/:username/following",
-  authMiddleware.protect,
-  userController.getFollowing
-);
-
-userRoutes.get(
-  "/:username/followers",
-  authMiddleware.protect,
-  userController.getFollowers
-);
-userRoutes.get("/:username/",userController.getByUsername)
- 
 userRoutes.get("/:username/following", protect, userController.getFollowing);
 userRoutes.get("/:username/followers", protect, userController.getFollowers);
+
+// 🟠 Get user by username (public)
+userRoutes.get("/:username", userController.getByUsername);
 
 export default userRoutes;

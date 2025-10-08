@@ -2,18 +2,34 @@
 import jwt from "jsonwebtoken";
 import { errorResponse } from "../utils/response.js";
 import User from "../models/User.js";
+import AppError from "../utils/appError.js";
 
-const authMiddleware = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
+const authMiddleware = async (req, res, next) => {
+  let token;
 
-  if (!token) return errorResponse(res, "Unauthorized", 401);
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer")
+  ) {
+    token = req.headers.authorization.split(" ")[1];
+  }
+
+  if (!token) {
+    return next(new AppError("You are not logged in. Please log in.", 401));
+  }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { _id: decoded.id }; // always use `id` from token
+
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return next(new AppError("The user no longer exists.", 401));
+    }
+
+    req.user = user; // attach full user object
     next();
   } catch (err) {
-    return errorResponse(res, "Invalid or expired token", 401);
+    return next(new AppError("Invalid or expired token", 401));
   }
 };
 
@@ -32,7 +48,6 @@ const authorize = (...roles) => {
 const protect = async (req, res, next) => {
   let token;
 
-  // Get token from header or cookie
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer")
@@ -43,23 +58,35 @@ const protect = async (req, res, next) => {
   }
 
   if (!token) {
-    return next(
-      new AppError("You are not logged in. Please log in to access.", 401)
-    );
+    return res.status(401).json({
+      success: false,
+      message: "You are not logged in. Please log in to access.",
+    });
   }
 
-  // Verify token
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  try {
+    // ✅ Verify token safely
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-  // Check if user still exists
-  const user = await User.findById(decoded.id);
-  if (!user) {
-    return next(new AppError("The user no longer exists.", 401));
+    // Check if user still exists
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "The user belonging to this token no longer exists.",
+      });
+    }
+
+    req.user = user;
+    next();
+  } catch (err) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
   }
-
-  req.user = user;
-  next();
 };
+
 
 export {authMiddleware, protect, authorize};
 
