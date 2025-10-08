@@ -12,6 +12,7 @@ import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import repoRouters from "./routes/repo.routes.js";
 import globalErrorHandler from "./middleware/errorHandler.js";
+import pullRequestRouters from "./routes/pullRequest.routes.js";
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use("/api", routes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/repos", repoRouters);
+app.use("/api/repos", pullRequestRouters);
 
 // Root test route
 app.get("/", (req, res) => {

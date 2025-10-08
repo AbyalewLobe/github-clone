@@ -22,6 +22,11 @@ repoRoutes
 repoRoutes
   .route("/:owner/:repo/collaborators/:username")
   .patch(authMiddleware.protect, repoController.updateCollaboratorPermission)
-  .post(authMiddleware.protect, repoController.addCollaborator);
+  .post(authMiddleware.protect, repoController.addCollaborator)
+  .delete(
+    authMiddleware.protect,
+    authMiddleware.authorize("owner", "admin"),
+    repoController.deleteCollaborator
+  );
 
 export default repoRoutes;
