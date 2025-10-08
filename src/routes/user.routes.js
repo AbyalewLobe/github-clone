@@ -2,6 +2,7 @@
 import express from "express";
 import userController from "../controllers/user.controller.js";
 import authMiddleware from "../middleware/authMiddleware.js";
+// import {protect} from "./middleware/authMiddleware.js"
 
 const userRoutes = express.Router();
 
@@ -40,5 +41,6 @@ userRoutes.get(
   authMiddleware.protect,
   userController.getFollowers
 );
+userRoutes.get("/:username/",userController.getByUsername)
 
 export default userRoutes;

@@ -150,7 +150,9 @@ export const signup = async (req, res, next) => {
       const field = Object.keys(err.keyPattern)[0];
       return res.status(400).json({
         success: false,
-        message: `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`,
+        message: `${
+          field.charAt(0).toUpperCase() + field.slice(1)
+        } already exists`,
       });
     }
     next(err);
@@ -354,6 +356,29 @@ export const googleLogin = async (req, res, next) => {
 };
 
 // ==============================
+// 🚪 Logout (Clear Cookie + Invalidate Session)
+// ==============================
+export const logout = async (req, res, next) => {
+  try {
+    // 1️⃣ Clear the JWT cookie
+    res.clearCookie("jwt", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // only use HTTPS in production
+      sameSite: "strict",
+    });
+
+    // 2️⃣ Optionally: instruct frontend to remove local storage token
+    // (Frontend usually deletes its stored token after receiving this message)
+
+    // 3️⃣ Send success response
+    return successResponse(res, {}, "Logged out successfully");
+  } catch (err) {
+    console.error("Logout error:", err);
+    next(new AppError("Error logging out. Please try again.", 500));
+  }
+};
+
+// ==============================
 // 📤 Export all controllers
 // ==============================
 export default {
@@ -364,4 +389,5 @@ export default {
   forgotPassword,
   resetPassword,
   googleLogin,
+  logout,
 };
