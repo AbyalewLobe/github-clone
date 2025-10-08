@@ -12,6 +12,7 @@ import { successResponse } from "../utils/response.js";
 export const createRepository = async (req, res, next) => {
   try {
     let { name, description, visibility } = req.body;
+
     if (!name?.trim()) {
       return next(new AppError("Repository name is required", 400));
     }
@@ -19,10 +20,28 @@ export const createRepository = async (req, res, next) => {
     const owner = req.user._id;
     name = name.trim().toLowerCase().replace(/\s+/g, "-");
 
-    const newRepo = new Repository({ name, description, visibility, owner });
+    const newRepo = new Repository({
+      name,
+      description,
+      visibility,
+      owner,
+    });
     await newRepo.save();
 
-    return successResponse(res, 201, newRepo);
+    const defaultBranch = new Branch({
+      repo: newRepo._id,
+      name: "main",
+      protected: true,
+    });
+    await defaultBranch.save();
+
+    newRepo.defaultBranch = defaultBranch.name;
+    await newRepo.save();
+
+    return successResponse(res, 201, {
+      message: "Repository created successfully with default 'main' branch",
+      repository: newRepo,
+    });
   } catch (error) {
     if (error.code === 11000) {
       return next(
@@ -32,11 +51,9 @@ export const createRepository = async (req, res, next) => {
     return next(error);
   }
 };
-
 //List repository
 export const listRepository = async (req, res, next) => {
   try {
-    // Extract query params
     const {
       owner,
       q,
@@ -241,6 +258,7 @@ export const addCollaborator = async (req, res, next) => {
   try {
     const { owner, repo, username } = req.params;
     const { permission = "read" } = req.body;
+
     const ownerUser = await User.findOne({ username: owner });
     if (!ownerUser) return next(new AppError("Owner not found", 404));
     const repository = await Repository.findOne({
@@ -251,6 +269,7 @@ export const addCollaborator = async (req, res, next) => {
     const isOwner =
       req.user && req.user._id.toString() === ownerUser._id.toString();
     const isAdmin = req.user && req.user.role === "admin";
+
     if (!isOwner && !isAdmin)
       return next(
         new AppError("You are not authorized to add collaborators", 403)
@@ -258,22 +277,51 @@ export const addCollaborator = async (req, res, next) => {
     const collaborator = await User.findOne({ username });
     if (!collaborator)
       return next(new AppError("Collaborator user not found", 404));
-    const exists = await RepoCollaborator.findOne({
+    let repoCollab = await RepoCollaborator.findOne({
       repo: repository._id,
       user: collaborator._id,
-    });
-    if (exists) return next(new AppError("User already a collaborator", 400));
-    const newCollaborator = await RepoCollaborator.create({
-      repo: repository._id,
-      user: collaborator._id,
-      permission,
     });
 
+    if (repoCollab) {
+      if (repoCollab.permission !== permission) {
+        repoCollab.permission = permission;
+        await repoCollab.save();
+      }
+    } else {
+      repoCollab = await RepoCollaborator.create({
+        repo: repository._id,
+        user: collaborator._id,
+        permission,
+      });
+    }
+    if (!repository.collaborators.includes(collaborator._id)) {
+      repository.collaborators.push(collaborator._id);
+    }
+    const existingMeta = repository.collaboratorsMeta.find(
+      (meta) => meta.user.toString() === collaborator._id.toString()
+    );
+
+    if (existingMeta) {
+      existingMeta.permission = permission;
+    } else {
+      repository.collaboratorsMeta.push({
+        user: collaborator._id,
+        permission,
+      });
+    }
+
+    await repository.save();
+
     return successResponse(res, 201, {
-      message: `User ${username} added as collaborator with ${permission} permission`,
-      collaborator: newCollaborator,
+      message: `User ${username} added as collaborator with '${permission}' permission`,
+      collaborator: {
+        id: collaborator._id,
+        username: collaborator.username,
+        permission,
+      },
     });
   } catch (error) {
+    console.error("❌ addCollaborator error:", error);
     return next(error);
   }
 };
@@ -290,7 +338,6 @@ export const updateCollaboratorPermission = async (req, res, next) => {
     const ownerUser = await User.findOne({ username: owner });
     if (!ownerUser) return next(new AppError("Owner not found", 404));
 
-    // 2️⃣ Find the repository
     const repository = await Repository.findOne({
       owner: ownerUser._id,
       name: repo.toLowerCase(),
@@ -327,6 +374,60 @@ export const updateCollaboratorPermission = async (req, res, next) => {
   }
 };
 
+export const deleteCollaborator = async (req, res) => {
+  try {
+    const { owner, repo, username } = req.params;
+
+    const ownerUser = await User.findOne({ username: owner });
+    if (!ownerUser)
+      return res
+        .status(404)
+        .json({ success: false, message: "Owner not found" });
+
+    const repository = await Repository.findOne({
+      owner: ownerUser._id,
+      name: repo.toLowerCase(),
+    });
+    if (!repository)
+      return res
+        .status(404)
+        .json({ success: false, message: "Repository not found" });
+
+    const isOwner = repository.owner.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === "admin";
+    if (!isOwner && !isAdmin)
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
+
+    const collaborator = await User.findOne({ username });
+    if (!collaborator)
+      return res
+        .status(404)
+        .json({ success: false, message: "Collaborator not found" });
+
+    if (repository.collaborators.includes(collaborator._id)) {
+      repository.collaborators.pull(collaborator._id);
+      await repository.save();
+    }
+    await RepoCollaborator.findOneAndDelete({
+      repo: repository._id,
+      user: collaborator._id,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Collaborator '${username}' removed successfully`,
+    });
+  } catch (error) {
+    console.error("❌ Delete collaborator error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Server error",
+    });
+  }
+};
+
 export default {
   createRepository,
   listRepository,
@@ -336,4 +437,5 @@ export default {
   getRepositoryCollaborators,
   addCollaborator,
   updateCollaboratorPermission,
+  deleteCollaborator,
 };
