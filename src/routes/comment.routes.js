@@ -10,6 +10,7 @@ commentRoutes.get("/", commentController.list);
 
 // Authenticated routes
 commentRoutes.use(authMiddleware.authMiddleware);
+commentRoutes.use(authMiddleware);
 
 // Add a comment to an issue
 commentRoutes.post("/", commentController.create);

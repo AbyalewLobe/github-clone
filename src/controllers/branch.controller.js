@@ -1,4 +1,5 @@
 import Branch from "../models/Branch.js";
+import crypto from "crypto";
 import Repository from "../models/Repository.js";
 import Commit from "../models/Commit.js";
 import mongoose from "mongoose";
@@ -50,41 +51,88 @@ export const create = async (req, res, next) => {
   try {
     const { owner, repo } = req.params;
     const { name, from, fromCommit } = req.body;
-   
+
+    // 1️⃣ Find the repository
     const repository = await Repository.findOne({ name: repo });
     if (!repository) return next(new AppError("Repository not found", 404));
 
-    // Check duplicate branch
+    // 2️⃣ Prevent duplicate branch names
     const existing = await Branch.findOne({ repo: repository._id, name });
     if (existing) return next(new AppError("Branch already exists", 400));
 
-    let baseCommitSha;
+    let baseCommitSha = null;
+    let newBranch;
 
+    // 3️⃣ CASE 1: From specific commit
     if (fromCommit) {
-      const commit = await Commit.findOne({
-        repo: repository._id,
-        hash: fromCommit,
-      });
+      const commit = await Commit.findOne({ repo: repository._id, hash: fromCommit });
       if (!commit) return next(new AppError("Base commit not found", 404));
-      baseCommitSha = commit.hash;
-    } else {
-      const baseBranchName = from || repository.defaultBranch;
-      const baseBranch = await Branch.findOne({
+
+      newBranch = await Branch.create({
         repo: repository._id,
-        name: baseBranchName,
+        name,
+        headSha: commit.hash,
       });
-      if (!baseBranch)
-        return next(
-          new AppError(`Base branch '${baseBranchName}' not found`, 404)
-        );
+
+      baseCommitSha = commit.hash;
+    }
+
+    // 4️⃣ CASE 2: From another branch
+    else if (from) {
+      const baseBranch = await Branch.findOne({ repo: repository._id, name: from });
+      if (!baseBranch) return next(new AppError(`Base branch '${from}' not found`, 404));
+
+      newBranch = await Branch.create({
+        repo: repository._id,
+        name,
+        headSha: baseBranch.headSha,
+      });
+
       baseCommitSha = baseBranch.headSha;
     }
 
-    const newBranch = await Branch.create({
-      repo: repository._id,
-      name,
-      headSha: baseCommitSha,
-    });
+    // 5️⃣ CASE 3: Orphan branch
+    else {
+      // 5.1 Create the new branch first (headSha will be set after commit)
+      newBranch = await Branch.create({
+        repo: repository._id,
+        name,
+        headSha: null,
+      });
+
+      // 5.2 Check if repo has initial commit
+      const initialCommit = await Commit.findOne({
+        repo: repository._id,
+        isInitial: true,
+      });
+
+      if (initialCommit) {
+        baseCommitSha = initialCommit.hash;
+        // Update branch head
+        newBranch.headSha = initialCommit.hash;
+        await newBranch.save();
+      } else {
+        // 5.3 Create empty commit linked to this new branch _id
+        const commitHash = crypto.randomBytes(20).toString("hex");
+
+        const emptyCommit = await Commit.create({
+          repo: repository._id,
+          hash: commitHash,
+          author: req.user ? req.user._id : repository.owner,
+          branch: newBranch._id,   // ✅ use ObjectId
+          message: `Initialize orphan branch '${name}'`,
+          tree: {},
+          parents: [],
+          isInitial: true,
+        });
+
+        baseCommitSha = emptyCommit.hash;
+
+        // 5.4 Update branch with the commit hash
+        newBranch.headSha = emptyCommit.hash;
+        await newBranch.save();
+      }
+    }
 
     res.status(201).json(newBranch);
   } catch (err) {

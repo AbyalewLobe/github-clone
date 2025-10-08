@@ -18,6 +18,8 @@ import commentRoutes from "./routes/comment.routes.js";
 
 // Middleware
 import branchRoutes from "./routes/branch.routes.js";
+import issueRoutes from "./routes/issue.routes.js";
+import commentRoutes from "./routes/comment.routes.js";
 import globalErrorHandler from "./middleware/errorHandler.js";
 import pullRequestRouters from "./routes/pullRequest.routes.js";
 
@@ -47,6 +49,14 @@ app.use("/api/repos/:owner/:repo/comments", commentRoutes);
 app.use("/api/repos", pullRequestRouters);
 
 app.use("/api/repos/:owner/:repo/branches", branchRoutes);
+
+
+// Nested Issue Routes
+app.use("/api/repos/:owner/:repo/issues", issueRoutes);
+
+// Nested Comment Routes (for global comments if needed)
+app.use("/api/repos/:owner/:repo/comments", commentRoutes);
+
 
 
 // Root test route

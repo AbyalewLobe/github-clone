@@ -48,7 +48,6 @@ export const create = async (req, res, next) => {
       assignees,
       labels,
     });
-
     return successResponse(res, newIssue, "Issue created successfully", 201);
   } catch (err) {
     next(err);

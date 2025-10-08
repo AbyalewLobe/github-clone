@@ -3,14 +3,14 @@ import jwt from "jsonwebtoken";
 import { errorResponse } from "../utils/response.js";
 import User from "../models/User.js";
 
-const authMiddleware = async (req, res, next) => {
+const authMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
 
   if (!token) return errorResponse(res, "Unauthorized", 401);
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // attach decoded user info
+    req.user = { _id: decoded.id }; // always use `id` from token
     next();
   } catch (err) {
     return errorResponse(res, "Invalid or expired token", 401);
@@ -60,8 +60,6 @@ const protect = async (req, res, next) => {
   req.user = user;
   next();
 };
-
-
 
 export {authMiddleware, protect, authorize};
 
