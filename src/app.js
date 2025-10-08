@@ -17,6 +17,7 @@ import commentRoutes from "./routes/comment.routes.js";
 
 // Middleware
 import globalErrorHandler from "./middleware/errorHandler.js";
+import pullRequestRouters from "./routes/pullRequest.routes.js";
 
 const app = express();
 
@@ -34,11 +35,14 @@ app.use("/api", routes);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/repos", repoRoutes);
+app.use("/api/repos", repoRoutes)
 
 // Nested routes under /api/repos/:owner/:repo
 app.use("/api/repos/:owner/:repo/issues", issueRoutes);
 app.use("/api/repos/:owner/:repo/comments", commentRoutes);
+
+
+app.use("/api/repos", pullRequestRouters);
 
 // Root test route
 app.get("/", (req, res) => {
