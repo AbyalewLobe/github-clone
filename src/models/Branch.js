@@ -10,7 +10,8 @@ const BranchSchema = new Schema(
       index: true,
     },
     name: { type: String, required: true },
-    headSha: { type: String },
+    latestCommit: { type: Types.ObjectId, ref: "Commit", default: null }, // track latest commit
+    headSha: { type: String }, // optional, can store commit hash
     protected: { type: Boolean, default: false },
   },
   { timestamps: true }

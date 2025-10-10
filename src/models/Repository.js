@@ -19,6 +19,7 @@ const RepositorySchema = new Schema(
         permission: { type: String, enum: ["read", "write", "admin"] },
       },
     ],
+    language: { type: String },
     starsCount: { type: Number, default: 0 },
     forksCount: { type: Number, default: 0 },
     isFork: { type: Boolean, default: false },
@@ -28,5 +29,7 @@ const RepositorySchema = new Schema(
 );
 
 RepositorySchema.index({ owner: 1, name: 1 }, { unique: true });
+RepositorySchema.index({ name: "text", description: "text" });
+
 
 export default mongoose.model("Repository", RepositorySchema);

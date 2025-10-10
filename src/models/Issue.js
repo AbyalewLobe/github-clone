@@ -22,5 +22,7 @@ const IssueSchema = new Schema(
 );
 
 IssueSchema.index({ repo: 1, number: 1 }, { unique: true });
+IssueSchema.index({ title: "text", description: "text" });
+
 
 export default mongoose.model("Issue", IssueSchema);

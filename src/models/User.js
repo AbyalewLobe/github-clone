@@ -10,6 +10,9 @@ const UserSchema = new Schema(
     bio: { type: String },
     avatarUrl: { type: String }, // ✅ Cloudinary image URL will be stored here
     role: { type: String, enum: ["user", "admin"], default: "user" },
+    publicReposCount: { type: Number, default: 0 },
+    location: { type: String },
+    type: { type: String, enum: ["user", "organization"], default: "user" },
     settings: { type: Object },
     isVerified: { type: Boolean, default: false },
     emailVerificationToken: { type: String },
@@ -21,5 +24,7 @@ const UserSchema = new Schema(
   },
   { timestamps: true }
 );
+
+UserSchema.index({ username: "text", name: "text", email: "text" });
 
 export default mongoose.model("User", UserSchema);

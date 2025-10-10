@@ -30,5 +30,6 @@ const PullRequestSchema = new Schema(
 );
 
 PullRequestSchema.index({ repo: 1, number: 1 }, { unique: true });
+PullRequestSchema.index({ title: "text", description: "text" });
 
 export default mongoose.model("PullRequest", PullRequestSchema);
