@@ -11,10 +11,16 @@ const CommitSchema = new Schema(
     },
     branch: { type: Types.ObjectId, ref: "Branch", required: true },
     author: { type: Types.ObjectId, ref: "User", required: true },
-    message: { type: String },
+    message: { type: String, required: true },
     hash: { type: String, required: true, index: true },
-    parents: [{ type: String }],
-    files: [{ path: String, action: String }],
+    parents: [{ type: Types.ObjectId, ref: "Commit" }], // references to parent commits
+    files: [
+      {
+        path: { type: String },
+        action: { type: String, enum: ["added", "modified", "deleted"] },
+        hash: { type: String }, // optional file hash at this commit
+      },
+    ],
     timestamp: { type: Date, default: Date.now },
   },
   { timestamps: true }
@@ -22,4 +28,4 @@ const CommitSchema = new Schema(
 
 CommitSchema.index({ repo: 1, hash: 1 }, { unique: true });
 
-export default mongoose.model("Commit", CommitSchema);
+export default mongoose.models.Commit || mongoose.model("Commit", CommitSchema);

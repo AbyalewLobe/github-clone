@@ -4,7 +4,7 @@ import { errorResponse } from "../utils/response.js";
 import User from "../models/User.js";
 import AppError from "../utils/appError.js";
 
-const authMiddleware = async (req, res, next) => {
+export const authMiddleware = async (req, res, next) => {
   let token;
 
   if (
@@ -33,7 +33,7 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-const authorize = (...roles) => {
+export const authorize = (...roles) => {
   return (req, res, next) => {
     if (
       !roles.includes(req.user.role) &&
@@ -45,7 +45,7 @@ const authorize = (...roles) => {
   };
 };
 
-const protect = async (req, res, next) => {
+export const protect = async (req, res, next) => {
   let token;
 
   if (
@@ -88,6 +88,6 @@ const protect = async (req, res, next) => {
 };
 
 
-export {authMiddleware, protect, authorize};
+export default{authMiddleware, protect, authorize};
 
  

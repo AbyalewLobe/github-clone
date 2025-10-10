@@ -8,16 +8,17 @@ const fileSchema = new Schema(
       ref: "Repository",
       required: true,
     },
-    path: { type: String, required: true }, // e.g. "src/index.js"
-    content: { type: String }, // optional: raw file content
+    commit: { type: Schema.Types.ObjectId, ref: "Commit", required: true },
+    path: { type: String, required: true },
+    content: { type: String },
     size: { type: Number, default: 0 },
     type: { type: String, enum: ["file", "dir"], default: "file" },
-    commit: { type: Schema.Types.ObjectId, ref: "Commit" },
-    hash: { type: String }, // sha or hash of file content
+    hash: { type: String },
   },
   { timestamps: true }
 );
 
-fileSchema.index({ repository: 1, path: 1 }, { unique: true });
+fileSchema.index({ repository: 1, path: 1, commit: 1 }, { unique: true });
 
-export default mongoose.model("File", fileSchema);
+// ✅ Check if model exists before creating
+export default mongoose.models.File || mongoose.model("File", fileSchema);

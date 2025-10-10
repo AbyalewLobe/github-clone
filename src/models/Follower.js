@@ -1,24 +1,23 @@
 import mongoose from "mongoose";
-const { Schema, Types } = mongoose;
+const { Schema } = mongoose;
 
-const FollowerSchema = new Schema(
+const fileSchema = new Schema(
   {
-    follower: {
-      type: Types.ObjectId,
-      ref: "User",
+    repository: {
+      type: Schema.Types.ObjectId,
+      ref: "Repository",
       required: true,
-      index: true,
     },
-    following: {
-      type: Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
+    commit: { type: Schema.Types.ObjectId, ref: "Commit", required: true }, // each file tied to a commit
+    path: { type: String, required: true }, // e.g. "src/index.js"
+    content: { type: String }, // raw file content
+    size: { type: Number, default: 0 },
+    type: { type: String, enum: ["file", "dir"], default: "file" },
+    hash: { type: String }, // SHA of content
   },
   { timestamps: true }
 );
 
-FollowerSchema.index({ follower: 1, following: 1 }, { unique: true });
+fileSchema.index({ repository: 1, path: 1, commit: 1 }, { unique: true });
 
-export default mongoose.model("Follower", FollowerSchema);
+export default mongoose.model("File", fileSchema);
