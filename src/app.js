@@ -11,6 +11,7 @@ import userRoutes from "./routes/user.routes.js";
 import repoRouters from "./routes/repo.routes.js";
 import globalErrorHandler from "./middleware/errorHandler.js";
 import commitRouters from "./routes/commit.routes.js";
+import orgRouter from "./routes/org.routes.js";
 
 
 dotenv.config();
@@ -34,6 +35,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/repos", repoRouters);
 app.use("/api/repos", commitRouters);
 app.use("/api/settings", settingRouter);
+app.use("/api/orgs", orgRouter);
 // Root test route
 app.get("/", (req, res) => {
   res.send("🚀 GitHub Clone API is running...");
