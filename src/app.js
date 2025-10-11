@@ -1,8 +1,6 @@
 // src/app.js
 import dotenv from "dotenv";
-
-dotenv.config();
-
+import settingRouter from "./routes/setting.routes.js";
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
@@ -13,6 +11,9 @@ import userRoutes from "./routes/user.routes.js";
 import repoRouters from "./routes/repo.routes.js";
 import globalErrorHandler from "./middleware/errorHandler.js";
 import commitRouters from "./routes/commit.routes.js";
+
+
+dotenv.config();
 
 const app = express();
 
@@ -32,7 +33,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/repos", repoRouters);
 app.use("/api/repos", commitRouters);
-
+app.use("/api/settings", settingRouter);
 // Root test route
 app.get("/", (req, res) => {
   res.send("🚀 GitHub Clone API is running...");
